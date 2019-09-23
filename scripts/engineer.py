@@ -30,6 +30,20 @@ def engineer_static():
     Engineer.engineer_static_only(data_path)
 
 
+def eng_strato():
+    # if the working directory is alread ml_drought don't need ../data
+    if Path('.').absolute().as_posix().split('/')[-1] == 'ml_drought':
+        data_path = Path('data')
+    else:
+        data_path = Path('../data')
+
+    engineer = Engineer(data_path, experiment='strato')
+    engineer.engineer(
+        test_year=2018, target_variable='u',
+    )
+
+
 if __name__ == '__main__':
-    engineer(pred_months=12)
+    eng_strato()
+    # engineer(pred_months=12)
     # engineer_static()

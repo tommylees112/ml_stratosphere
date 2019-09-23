@@ -66,7 +66,7 @@ class StratoEngineer:
             expected_length=expected_length,
         )
 
-        normalization_values = self._calculate_normalization_values(train_ds)
+        # normalization_values = self._calculate_normalization_values(train_ds)
 
         # split train_ds into x, y for each year-month before `test_year` & save
         self._stratify_training_data(
@@ -74,9 +74,9 @@ class StratoEngineer:
             pred_months=pred_months
         )
 
-        savepath = self.output_folder / 'normalizing_dict.pkl'
-        with savepath.open('wb') as f:
-            pickle.dump(normalization_values, f)
+        # savepath = self.output_folder / 'normalizing_dict.pkl'
+        # with savepath.open('wb') as f:
+        #     pickle.dump(normalization_values, f)
 
     def _get_preprocessed_files(self) -> List[Path]:
         processed_files = []
@@ -115,23 +115,31 @@ class StratoEngineer:
 
         cur_pred_year, cur_pred_month = max_date.year, max_date.month
 
-        # TODO: FINISH THIS OFF
+        group_year_month: List[List[Tuple[int, int]]] = []
+        for year in range(min_year, max_year - 1):
+            group: List[Tuple[int, int]] = []
+            for months in self.relevant_months[0]:
+                for month in months:
+                    group.append((year, month))
+            for months in self.relevant_months[1]:
+                for month in months:
+                    group.append((year + 1, month))
+            group_year_month.append(group)
 
-        # for every month-year create & save the x, y datasets for training
-        cur_min_date = max_date
-        while cur_min_date >= min_date:
-            # each iteration count down one month (02 -> 01 -> 12 ...)
-            arrays, cur_min_date, triggered = self._stratify_xy(
-                ds=train_ds, year=cur_pred_year,
-                target_variable=target_variable, target_month=cur_pred_month,
-                pred_days=pred_months,
-            )
-            if arrays is not None:
-                self._save(
-                    arrays, year=cur_pred_year, month=cur_pred_month,
-                    dataset_type='train'
-                )
-            cur_pred_year, cur_pred_month = cur_min_date.year, cur_min_date.month
+        for group in group_year_month:
+            for year, month in group:
+                if date(year, month, 1) < max_date:
+                    arrays, _, triggered = self._stratify_xy(
+                        ds=train_ds, year=cur_pred_year,
+                        target_variable=target_variable, target_month=cur_pred_month,
+                        pred_days=pred_months,
+                        )
+                    self._save(
+                        arrays, year=cur_pred_year, month=cur_pred_month,
+                        dataset_type='train'
+                    )
+                    if triggered:
+                        break
 
     def _train_test_split(self, ds: xr.Dataset,
                           years: List[int],
@@ -144,16 +152,15 @@ class StratoEngineer:
         years.sort()
 
         # for the first `year` Jan calculate the xy_test dictionary and min date
-        group_year_month = List[List[Tuple[int, int]]]
-        group = 0
+        group_year_month: List[List[Tuple[int, int]]] = []
+        group: List[Tuple[int, int]] = []
         for year in years:
-            for months in self.relevant_months[0]:
-                for month in months:
-                    group_year_month.append(group, year, month)
-            for months in self.relevant_months[1]:
-                for month in months:
-                    group_year_month.append(group, year + 1, month)
-            group += 1
+            for month in self.relevant_months[0]:
+                group.append((year, month))
+            for month in self.relevant_months[1]:
+                group.append((year + 1, month))
+            group_year_month.append(group)
+            group = []
 
         xy_tests, min_test_date, triggered = self._stratify_xy(
             ds=ds, year=group_year_month[0][0][0], target_variable=target_variable,
@@ -171,18 +178,17 @@ class StratoEngineer:
 
         # each month in test_year produce an x,y pair for testing
         for group in group_year_month:
-            for years_months in group:
-                for year, month in years_months:
-                    # prevents the initial test set from being recalculated
-                    xy_test, _, triggered = self._stratify_xy(
-                        ds=ds, year=year, target_variable=target_variable,
-                        target_month=month, pred_days=pred_days
+            for year, month in group:
+                # prevents the initial test set from being recalculated
+                xy_test, _, triggered = self._stratify_xy(
+                    ds=ds, year=year, target_variable=target_variable,
+                    target_month=month, pred_days=pred_days
+                )
+                if xy_test is not None:
+                    self._save(
+                        xy_test, year=year, month=month,
+                        dataset_type='test'
                     )
-                    if xy_test is not None:
-                        self._save(
-                            xy_test, year=year, month=month,
-                            dataset_type='test'
-                        )
                 if triggered:
                     break
 
@@ -262,13 +268,12 @@ class StratoEngineer:
         save_folder = self.output_folder / dataset_type
         save_folder.mkdir(exist_ok=True)
 
-        output_location = save_folder / f'{year}_{month}'
-        output_location.mkdir(exist_ok=True)
-
         for idx, week in enumerate(ds_dicts):
+            output_location = save_folder / f'{year}_{month}_{idx + 1}'
+            output_location.mkdir(exist_ok=True)
             for x_or_y, output_ds in week.items():
-                print(f'Saving data to {output_location.as_posix()}/{x_or_y}_{idx}.nc')
-                output_ds.to_netcdf(output_location / f'{x_or_y}_{idx}.nc')
+                print(f'Saving data to {output_location.as_posix()}/{x_or_y}.nc')
+                output_ds.to_netcdf(output_location / f'{x_or_y}.nc')
 
     def _calculate_normalization_values(self,
                                         x_data: xr.Dataset) -> DefaultDict[str, Dict[str, float]]:

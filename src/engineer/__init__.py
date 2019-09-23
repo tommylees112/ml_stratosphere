@@ -26,14 +26,16 @@ class Engineer:
                  process_static: bool = True,
                  experiment: str = 'one_month_forecast') -> None:
 
-        assert experiment in {'one_month_forecast', 'nowcast'},\
-            'Experiment not recognized! Must be one of {nowcast, one_month_forecast}'
+        assert experiment in {'one_month_forecast', 'nowcast', 'strato'},\
+            'Experiment not recognized! Must be one of {nowcast, one_month_forecast, strato}'
 
         engineer: _EngineerBase
         if experiment == 'one_month_forecast':
             engineer = _OneMonthForecastEngineer(data_folder, process_static)
         elif experiment == 'nowcast':
             engineer = _NowcastEngineer(data_folder, process_static)
+        elif experiment == 'strato':
+            engineer = StratoEngineer(data_folder)
         self.engineer_class = engineer
 
     def engineer(self, test_year: Union[int, List[int]],
