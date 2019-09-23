@@ -2,9 +2,11 @@ from pathlib import Path
 
 from typing import Union, List, Optional
 
-from .nowcast import _NowcastEngineer
-from .one_month_forecast import _OneMonthForecastEngineer
-from .base import _EngineerBase
+from .drought.nowcast import _NowcastEngineer
+from .drought.one_month_forecast import _OneMonthForecastEngineer
+from .drought.base import _EngineerBase
+
+from .strato import StratoEngineer
 
 
 class Engineer:
